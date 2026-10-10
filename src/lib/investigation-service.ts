@@ -189,7 +189,8 @@ export async function executeInvestigation(
   _file?: File | null
 ): Promise<InvestigationResult> {
   void _file;
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
+  const apiUrl = rawApiUrl.replace(/\/+$/, "");
 
   try {
     const res = await fetch(`${apiUrl}/api/investigate`, {

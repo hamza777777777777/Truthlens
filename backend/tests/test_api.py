@@ -236,3 +236,67 @@ def test_404_not_found(client):
     assert response.status_code == 404
     data = response.get_json()
     assert data["error"] == "Not Found"
+
+
+# --- Production Deployment Safety & Configuration Tests ---
+
+def test_production_config_missing_secret_key_fails_safely():
+    """In production, missing SECRET_KEY raises a clear configuration error."""
+    import os
+    with patch.dict(os.environ, {"SECRET_KEY": "", "GEMINI_MODEL": "gemini-3.8-flash"}, clear=False):
+        with pytest.raises(ValueError) as exc_info:
+            create_app("production")
+        assert "SECRET_KEY must be explicitly configured" in str(exc_info.value)
+
+
+def test_production_config_dev_secret_key_fails_safely():
+    """In production, using the development fallback SECRET_KEY raises a security error."""
+    import os
+    with patch.dict(os.environ, {
+        "SECRET_KEY": "dev-secret-key-truthlens-do-not-use-in-production",
+        "GEMINI_MODEL": "gemini-3.8-flash"
+    }, clear=False):
+        with pytest.raises(ValueError) as exc_info:
+            create_app("production")
+        assert "cannot use the development fallback key" in str(exc_info.value)
+
+
+def test_production_config_missing_gemini_model_fails_safely():
+    """In production, GEMINI_MODEL must be explicitly configured without implicit fallback."""
+    import os
+    with patch.dict(os.environ, {
+        "SECRET_KEY": "production-secure-key-12345",
+        "GEMINI_MODEL": ""
+    }, clear=False):
+        with pytest.raises(ValueError) as exc_info:
+            create_app("production")
+        assert "GEMINI_MODEL must be explicitly configured" in str(exc_info.value)
+
+
+def test_production_config_wildcard_cors_forbidden():
+    """In production, arbitrary wildcard origin '*' is strictly rejected."""
+    import os
+    with patch.dict(os.environ, {
+        "SECRET_KEY": "production-secure-key-12345",
+        "GEMINI_MODEL": "gemini-3.8-flash",
+        "CORS_ORIGINS": "*"
+    }, clear=False):
+        with pytest.raises(ValueError) as exc_info:
+            create_app("production")
+        assert "Wildcard origin '*' is forbidden" in str(exc_info.value)
+
+
+def test_production_config_valid_environment_succeeds():
+    """In production with valid SECRET_KEY, explicit GEMINI_MODEL, and explicit Vercel CORS, app creates cleanly."""
+    import os
+    with patch.dict(os.environ, {
+        "SECRET_KEY": "production-secure-key-12345",
+        "GEMINI_MODEL": "gemini-3.8-flash",
+        "CORS_ORIGINS": "https://truthlens.vercel.app,http://localhost:3000"
+    }, clear=False):
+        prod_app = create_app("production")
+        assert prod_app is not None
+        assert prod_app.config["SECRET_KEY"] == "production-secure-key-12345"
+        assert prod_app.config["GEMINI_MODEL"] == "gemini-3.8-flash"
+        assert prod_app.config["CORS_ORIGINS"] == ["https://truthlens.vercel.app", "http://localhost:3000"]
+

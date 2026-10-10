@@ -28,9 +28,9 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///:memory:")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Gemini Configuration
+    # Gemini Configuration (explicitly required; no implicit model fallback)
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "")
 
     # Placeholders for future integrations
     SUPABASE_URL = os.getenv("SUPABASE_URL", "")
@@ -45,10 +45,15 @@ class TestingConfig(Config):
     TESTING = True
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SECRET_KEY = "test-secret-key-truthlens"
 
 
 class ProductionConfig(Config):
     DEBUG = False
+    # Never inherit the development SECRET_KEY fallback
+    SECRET_KEY = os.getenv("SECRET_KEY", None)
+    # Never inherit an implicit model fallback
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", None)
 
 
 config_by_name = {
