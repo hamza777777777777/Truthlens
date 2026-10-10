@@ -32,6 +32,9 @@ class Config:
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "")
 
+    # Tavily Search API — Phase 5A primary evidence provider (optional; falls back to Google grounding)
+    TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+
     # Placeholders for future integrations
     SUPABASE_URL = os.getenv("SUPABASE_URL", "")
     SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")

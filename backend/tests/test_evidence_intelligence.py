@@ -52,9 +52,11 @@ from app.services.evidence_service import (
 )
 from app.services.investigation_service import investigate
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def disable_tavily_for_google_tests(monkeypatch):
+    """Ensure Tavily is not active during Google Search Grounding unit tests."""
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+
 
 SAMPLE_CLAIMS: List[ClaimAnalysis] = [
     ClaimAnalysis(

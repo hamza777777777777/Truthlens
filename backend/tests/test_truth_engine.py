@@ -50,9 +50,11 @@ from app.services.truth_engine import (
     evaluate_truth,
 )
 
-# ---------------------------------------------------------------------------
-# Test Fixtures & Helpers
-# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def disable_tavily_for_truth_tests(monkeypatch):
+    """Ensure Tavily is not active during Truth Engine unit tests."""
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+
 
 def _make_claim(
     claim_id: str = "cl-1",

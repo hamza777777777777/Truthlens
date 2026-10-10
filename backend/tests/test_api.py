@@ -18,7 +18,14 @@ from app.schemas.content_analysis import (
     SuspiciousSignal,
     UrlTarget,
 )
+from app.schemas.evidence import FailureCategory, GroundingAnalysis, RetrievalStatus
 from app.schemas.investigation import InvestigationResult
+
+
+@pytest.fixture(autouse=True)
+def disable_tavily_for_api_tests(monkeypatch):
+    """Ensure Tavily is not active during API unit tests."""
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
 
 
 @pytest.fixture
@@ -27,6 +34,12 @@ def client():
     with app.test_client() as test_client:
         yield test_client
 
+
+MOCK_GROUNDING = GroundingAnalysis(
+    retrieval_status=RetrievalStatus.FAILED,
+    failure_category=FailureCategory.PROVIDER_ERROR,
+    is_grounded=False,
+)
 
 MOCK_ANALYSIS = ContentAnalysis(
     normalized_text="Congratulations! You've won ₹50,000. Pay ₹499 to claim your reward at https://sbi-reward-claim.example",
@@ -106,7 +119,8 @@ def test_investigate_valid_text(client):
         "input_type": "text",
         "content": "Congratulations! You've won ₹50,000. Pay ₹499 to claim your reward at https://sbi-reward-claim.example",
     }
-    with patch("app.services.investigation_service.analyze_content", return_value=MOCK_ANALYSIS):
+    with patch("app.services.investigation_service.analyze_content", return_value=MOCK_ANALYSIS), \
+         patch("app.services.investigation_service.ground_claims", return_value=MOCK_GROUNDING):
         response = client.post(
             "/api/investigate",
             data=json.dumps(payload),
@@ -141,7 +155,8 @@ def test_investigate_frontend_aliases(client):
         "inputMode": "text",
         "text": "Special grant awarded. Send processing fee immediately.",
     }
-    with patch("app.services.investigation_service.analyze_content", return_value=MOCK_ANALYSIS):
+    with patch("app.services.investigation_service.analyze_content", return_value=MOCK_ANALYSIS), \
+         patch("app.services.investigation_service.ground_claims", return_value=MOCK_GROUNDING):
         response = client.post(
             "/api/investigate",
             data=json.dumps(payload),
@@ -158,7 +173,8 @@ def test_investigate_url_input(client):
         "input_type": "url",
         "content": "https://sbi-reward-claim.example",
     }
-    with patch("app.services.investigation_service.analyze_content", return_value=MOCK_ANALYSIS):
+    with patch("app.services.investigation_service.analyze_content", return_value=MOCK_ANALYSIS), \
+         patch("app.services.investigation_service.ground_claims", return_value=MOCK_GROUNDING):
         response = client.post(
             "/api/investigate",
             data=json.dumps(payload),
