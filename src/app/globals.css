@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-muted: var(--surface);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary-accent: var(--secondary-accent);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--primary);
+
+  --color-verified: var(--verified);
+  --color-false: var(--false);
+  --color-partial: var(--partial);
+  --color-outdated: var(--outdated);
+  --color-cannot-confirm: var(--cannot-confirm);
+
+  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+}
+
+:root {
+  /* TruthLens AI Centralized Design Tokens */
+  --background: #080B12;
+  --surface: #0E1420;
+  --surface-elevated: #111927;
+
+  --foreground: #F4F7FB;
+  --muted-foreground: #8A99AD;
+
+  --primary: #57D6FF;
+  --primary-foreground: #080B12;
+  --secondary-accent: #9B8CFF;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-focus: rgba(87, 214, 255, 0.5);
+
+  /* Semantic Truth Status Tokens */
+  --verified: #1FD882;
+  --false: #FF5C5C;
+  --partial: #F59E0B;
+  --outdated: #F97316;
+  --cannot-confirm: #64748B;
+
+  --radius: 0.5rem;
+}
+
+/* Global Visual Foundation */
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Monospace & technical data */
+code, pre, kbd, samp {
+  font-family: var(--font-mono);
+}
+
+/* Selection Styling */
+::selection {
+  background: rgba(87, 214, 255, 0.22);
+  color: #F4F7FB;
+}
+
+/* Accessible Focus States */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Reduced Motion Respect */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
