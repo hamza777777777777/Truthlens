@@ -111,9 +111,13 @@ export function VerdictSummary({ result }: VerdictSummaryProps) {
                   ? `External evidence retrieved, but Truth Engine encountered an assessment failure (${result.truthAssessmentFailureCategory || "PROVIDER_ERROR"}). No verdict has been fabricated.`
                   : isNotAssessed
                     ? isRetrievalSkipped
-                      ? `External evidence retrieval was not attempted due to upstream processing limits (${result.contentAnalysisFailureCategory || "RATE_LIMIT"}). The Truth Engine has not evaluated these claims.`
+                      ? result.contentAnalysisFailureCategory
+                        ? `External evidence retrieval was not attempted due to upstream processing limits (${result.contentAnalysisFailureCategory}). The Truth Engine has not evaluated these claims.`
+                        : "External evidence retrieval was skipped because no usable claims were extracted. The Truth Engine has not evaluated these claims."
                       : isRetrievalFailed
-                      ? "External evidence retrieval failed before truth assessment. The Truth Engine has not evaluated these claims."
+                      ? `External evidence retrieval failed before truth assessment${result.evidenceFailureCategory ? ` (${result.evidenceFailureCategory})` : ""}. The Truth Engine has not evaluated these claims.`
+                      : result.evidenceRetrievalStatus === "NO_EVIDENCE"
+                      ? "External evidence search completed with no external sources returned. The Truth Engine has not evaluated these claims."
                       : "Atomic claims isolated and grounded; deterministic truth assessment executes in subsequent phase."
                     : result.truthStatus === "CANNOT CONFIRM"
                       ? "Assessment performed; available external evidence is insufficient to confirm or refute."

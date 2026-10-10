@@ -32,6 +32,17 @@ from app.services.gemini_service import (
 )
 
 
+def _is_url_only_text(text: str) -> bool:
+    """Check if input consists only of a URL with no substantive textual claims."""
+    stripped = text.strip()
+    if not stripped:
+        return False
+    if re.match(r"^https?://[^\s]+$", stripped):
+        return True
+    text_no_urls = re.sub(r"https?://[^\s]+", "", stripped).strip()
+    return not any(c.isalnum() for c in text_no_urls)
+
+
 def _fallback_content_analysis(text: str) -> ContentAnalysis:
     """Deterministic fallback content analysis when Gemini provider is rate-limited or fails."""
     # 1. URL extraction
@@ -55,7 +66,9 @@ def _fallback_content_analysis(text: str) -> ContentAnalysis:
             entities.append(EntityAnalysis(name=ent, type="organization", context="Named in message", confidence=0.9))
 
     # 3. Basic atomic claim extraction
-    sentences = [s.strip() for s in re.split(r"[.!?\n]+", text) if len(s.strip()) > 8]
+    # Strip URLs from text before sentence splitting to prevent URL fragments from becoming claims
+    text_without_urls = re.sub(r"https?://[^\s]+", "", text).strip()
+    sentences = [s.strip() for s in re.split(r"[.!?\n]+", text_without_urls) if len(s.strip()) > 8]
     claims = []
     if sentences:
         for idx, s in enumerate(sentences[:3]):
@@ -73,17 +86,19 @@ def _fallback_content_analysis(text: str) -> ContentAnalysis:
                     confidence=0.85,
                 )
             )
-    else:
+    elif text_without_urls and len(text_without_urls) > 8:
         claims.append(
             ClaimAnalysis(
                 id="cl-1",
-                statement=text[:140],
+                statement=text_without_urls[:140],
                 category="benefit_claim",
                 claim_type="factual",
                 importance="high",
                 confidence=0.80,
             )
         )
+    # Note: If text is URL-only (text_without_urls is empty), claims remains empty.
+    # A raw URL is not automatically treated as a factual assertion.
 
     # 4. Basic heuristic signals
     signals = []
@@ -316,8 +331,10 @@ def investigate(
         elif grounding.retrieval_status == RetrievalStatus.NO_EVIDENCE:
             evidence_note = "External evidence search completed successfully; no external sources were returned for this claim. "
         elif grounding.retrieval_status == RetrievalStatus.SKIPPED:
-            fail_str = content_analysis_failure.value if content_analysis_failure else "LIMIT"
-            evidence_note = f"External evidence retrieval was skipped ({fail_str} upstream); evidence assessment is pending. "
+            if content_analysis_failure:
+                evidence_note = f"External evidence retrieval was skipped ({content_analysis_failure.value} upstream); evidence assessment is pending. "
+            else:
+                evidence_note = "External evidence retrieval was skipped because no discrete claims were isolated; evidence assessment is pending. "
         else:
             fail_cat_str = grounding.failure_category.value if grounding.failure_category else "UNKNOWN"
             evidence_note = f"Evidence retrieval could not be completed ({fail_cat_str}); evidence assessment is pending. "
@@ -345,8 +362,8 @@ def investigate(
             )
         )
 
-    # Fallback claim if content had no discrete claims
-    if not claims:
+    # Fallback claim if content had no discrete claims (do not fabricate factual claim for URL-only input)
+    if not claims and not _is_url_only_text(normalized_input):
         claims.append(
             Claim(
                 id="cl-1",
@@ -474,9 +491,24 @@ def investigate(
             )
         ]
     elif grounding.retrieval_status == RetrievalStatus.SKIPPED:
-        # State 3: SKIPPED — Grounding was skipped due to upstream content analysis failure/fallback
-        fail_cat_label = content_analysis_failure.value if content_analysis_failure else "LIMIT"
-        logger.info(f"[INVESTIGATION] Evidence retrieval skipped ({fail_cat_label} upstream).")
+        # State 3: SKIPPED — Grounding was skipped due to upstream content analysis failure/fallback or no usable claims
+        if content_analysis_failure:
+            fail_cat_label = content_analysis_failure.value
+            logger.info(f"[INVESTIGATION] Evidence retrieval skipped ({fail_cat_label} upstream).")
+            excerpt = (
+                f"External evidence retrieval was not attempted because upstream content intelligence "
+                f"encountered a {fail_cat_label} limit. Grounding was skipped. "
+                "The Truth Engine does not yet have sufficient evidence to make an assessment. "
+                "No fabricated evidence has been inserted."
+            )
+        else:
+            logger.info("[INVESTIGATION] Evidence retrieval skipped (no discrete claims isolated).")
+            excerpt = (
+                "External evidence retrieval was skipped because no discrete atomic claims were isolated "
+                "in the submitted content. Grounding was skipped. "
+                "The Truth Engine does not yet have sufficient evidence to make an assessment. "
+                "No fabricated evidence has been inserted."
+            )
         evidence = [
             EvidenceSource(
                 id="ev-retrieval-skipped",
@@ -488,12 +520,7 @@ def investigate(
                 tier_label="Retrieval Skipped",
                 stance=SourceStance.INSUFFICIENT,
                 confidence_score=0.0,
-                excerpt=(
-                    f"External evidence retrieval was not attempted because upstream content intelligence "
-                    f"encountered a {fail_cat_label} limit. Grounding was skipped. "
-                    "The Truth Engine does not yet have sufficient evidence to make an assessment. "
-                    "No fabricated evidence has been inserted."
-                ),
+                excerpt=excerpt,
                 is_simulated_demo=True,
             )
         ]
@@ -579,7 +606,10 @@ def investigate(
         truth_status = None
         truth_assessment_status = TruthAssessmentStatus.NOT_ASSESSED
         truth_assessment_failure_cat = None
-        truth_synthesis = "Evidence retrieval was skipped; truth assessment was not run."
+        if content_analysis_failure:
+            truth_synthesis = f"Evidence retrieval was skipped due to upstream limits ({content_analysis_failure.value}); truth assessment was not run."
+        else:
+            truth_synthesis = "Evidence retrieval was skipped because no discrete claims were isolated; truth assessment was not run."
     elif grounding.retrieval_status == RetrievalStatus.FAILED:
         logger.info("[INVESTIGATION] Evidence retrieval failed; skipping truth assessment.")
         truth_status = None
@@ -614,14 +644,22 @@ def investigate(
         )
         grounding_note = "External evidence search completed with no external sources returned. "
     elif grounding.retrieval_status == RetrievalStatus.SKIPPED:
-        fail_label = content_analysis_failure.value if content_analysis_failure else "LIMIT"
         grounding_headline = " [EVIDENCE RETRIEVAL SKIPPED]"
-        grounding_summary = (
-            f"External evidence retrieval was not attempted ({fail_label} upstream). "
-            "The Truth Engine does not yet have sufficient evidence to make an assessment. "
-            "No fabricated sources have been inserted. "
-        )
-        grounding_note = f"Evidence retrieval was skipped ({fail_label} upstream). "
+        if content_analysis_failure:
+            fail_label = content_analysis_failure.value
+            grounding_summary = (
+                f"External evidence retrieval was not attempted ({fail_label} upstream). "
+                "The Truth Engine does not yet have sufficient evidence to make an assessment. "
+                "No fabricated sources have been inserted. "
+            )
+            grounding_note = f"Evidence retrieval was skipped ({fail_label} upstream). "
+        else:
+            grounding_summary = (
+                "External evidence retrieval was skipped because no discrete claims were isolated. "
+                "The Truth Engine does not yet have sufficient evidence to make an assessment. "
+                "No fabricated sources have been inserted. "
+            )
+            grounding_note = "Evidence retrieval was skipped because no discrete claims were isolated. "
     else:
         fail_label = grounding.failure_category.value if grounding.failure_category else "UNKNOWN"
         grounding_headline = " [EVIDENCE RETRIEVAL FAILED]"

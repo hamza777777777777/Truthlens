@@ -34,7 +34,7 @@ backend_root = Path(__file__).resolve().parent.parent
 if str(backend_root) not in sys.path:
     sys.path.insert(0, str(backend_root))
 
-from app.schemas.content_analysis import ClaimAnalysis
+from app.schemas.content_analysis import ClaimAnalysis, ContentAnalysis, LanguageInfo, UrlTarget
 from app.schemas.evidence import (
     FailureCategory,
     GroundingAnalysis,
@@ -55,7 +55,7 @@ from app.services.evidence_service import (
     ground_claims,
     UsageLimitExceededError,
 )
-from app.services.investigation_service import investigate
+from app.services.investigation_service import _fallback_content_analysis, investigate
 
 # Patch target for TavilyClient — module-level import in evidence_service
 _TAVILY_PATCH = "app.services.evidence_service.TavilyClient"
@@ -969,3 +969,138 @@ class TestBuildSearchQueries:
         queries = _build_search_queries([], ORIGINAL_TEXT)
         assert len(queries) == 1
         assert ORIGINAL_TEXT[:120] in queries[0] or queries[0] in ORIGINAL_TEXT
+
+
+# ---------------------------------------------------------------------------
+# 14. ZERO CLAIMS & URL FALLBACK REGRESSION TESTS
+# ---------------------------------------------------------------------------
+
+class TestZeroClaimsAndUrlFallbackRegressions:
+    """Regression tests for zero-claims, URL-only inputs, and safe attribution."""
+
+    def test_gemini_success_with_zero_claims_does_not_falsely_report_rate_limit(self):
+        """1. Gemini success with zero claims does not falsely report RATE_LIMIT."""
+        empty_analysis = ContentAnalysis(
+            normalized_text="Hello there! Just checking in today.",
+            language=LanguageInfo(code="en", name="English", confidence=0.95),
+            claims=[],
+            entities=[],
+            urls=[],
+            suspicious_signals=[],
+        )
+
+        request = InvestigationRequest(
+            input_type="text",
+            content="Hello there! Just checking in today.",
+        )
+        with patch("app.services.investigation_service.analyze_content", return_value=empty_analysis):
+            result = investigate(request)
+
+        assert result.content_extraction_mode == "GEMINI_LLM"
+        assert result.content_analysis_failure_category is None
+        assert result.evidence_retrieval_status == RetrievalStatus.SKIPPED
+        assert "RATE_LIMIT" not in result.summary_explanation
+        assert "LIMIT upstream" not in result.summary_explanation
+        assert "no discrete claims were isolated" in result.summary_explanation.lower()
+        assert result.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
+        assert result.truth_status is None
+
+    def test_url_only_input_does_not_generate_fabricated_factual_claim(self):
+        """2. URL-only input does not generate a fabricated factual claim."""
+        url_input = "https://sbi-secure-portal.xyz/login"
+
+        # Case A: Fallback parser directly on URL-only input
+        fallback = _fallback_content_analysis(url_input)
+        assert len(fallback.claims) == 0
+        assert len(fallback.urls) == 1
+        assert fallback.urls[0].url == url_input
+
+        # Case B: Investigation with URL-only input and LLM returning zero claims
+        url_analysis = ContentAnalysis(
+            normalized_text=url_input,
+            language=LanguageInfo(code="en", name="English", confidence=0.9),
+            claims=[],
+            entities=[],
+            urls=[UrlTarget(url=url_input, domain="sbi-secure-portal.xyz", context="Extracted link")],
+            suspicious_signals=[],
+        )
+        request = InvestigationRequest(input_type="url", content=url_input)
+        with patch("app.services.investigation_service.analyze_content", return_value=url_analysis):
+            result = investigate(request)
+
+        assert len(result.claims) == 0
+        assert result.metrics.claims_detected == 0
+        assert result.url_analysis is not None
+        assert result.url_analysis.analyzed_url == url_input
+        for c in result.claims:
+            assert c.statement != url_input
+            assert c.category != "factual_assertion"
+
+    def test_gemini_rate_limit_with_tavily_configured_attempts_retrieval_on_usable_claims(self):
+        """3. Gemini rate limit plus configured Tavily still attempts retrieval when safe, usable fallback claims exist."""
+        from app.services.gemini_service import GeminiRateLimitError
+
+        mock_client = MagicMock()
+        mock_client.search.return_value = MOCK_TAVILY_SUCCESS_RESPONSE
+
+        request = InvestigationRequest(
+            input_type="text",
+            content="State Bank of India is distributing ₹50,000 refund to all eligible account holders.",
+        )
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}, clear=False), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
+                   side_effect=GeminiRateLimitError("Rate limit exceeded")):
+            result = investigate(request)
+
+        assert result.content_extraction_mode == "DETERMINISTIC_FALLBACK"
+        assert result.content_analysis_failure_category == FailureCategory.RATE_LIMIT
+        assert result.evidence_retrieval_status == RetrievalStatus.SUCCESS
+        assert result.metrics.sources_corroborated > 0
+        assert mock_client.search.called is True
+
+    def test_tavily_success_after_gemini_failure_never_fabricates_truth_verdict(self):
+        """4. Tavily success after Gemini failure never fabricates a truth verdict."""
+        from app.services.gemini_service import GeminiRateLimitError
+
+        mock_client = MagicMock()
+        mock_client.search.return_value = MOCK_TAVILY_SUCCESS_RESPONSE
+
+        request = InvestigationRequest(
+            input_type="text",
+            content="State Bank of India is distributing ₹50,000 refund to all eligible account holders.",
+        )
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}, clear=False), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
+                   side_effect=GeminiRateLimitError("Rate limit exceeded")):
+            result = investigate(request)
+
+        # Invariant: truth status MUST be None, status NOT_ASSESSED
+        assert result.truth_status is None
+        assert result.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
+        for claim in result.claims:
+            assert claim.truth_status is None
+            assert claim.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
+        assert "epistemic truth assessment requires Gemini LLM intelligence" in result.summary_explanation
+
+    def test_genuine_rate_limit_messages_remain_accurate(self):
+        """5. Genuine rate-limit messages remain accurate."""
+        from app.services.gemini_service import GeminiRateLimitError
+
+        request = InvestigationRequest(
+            input_type="text",
+            content="State Bank of India is distributing ₹50,000 refund to all eligible account holders.",
+        )
+        with patch("app.services.investigation_service._get_tavily_api_key", return_value=None), \
+             patch("app.services.investigation_service.analyze_content",
+                   side_effect=GeminiRateLimitError("Rate limit exceeded")):
+            result = investigate(request)
+
+        assert result.content_extraction_mode == "DETERMINISTIC_FALLBACK"
+        assert result.content_analysis_failure_category == FailureCategory.RATE_LIMIT
+        assert result.evidence_retrieval_status == RetrievalStatus.SKIPPED
+        assert "RATE_LIMIT" in result.summary_explanation
+        assert any("RATE_LIMIT upstream" in c.explanation for c in result.claims)
+        assert "RATE_LIMIT limit" in result.evidence[0].excerpt
+
