@@ -104,7 +104,7 @@ def analyze_content(
     metadata: Optional[Dict[str, Any]] = None,
     client: Optional[genai.Client] = None,
 ) -> ContentAnalysis:
-    """Analyze raw content through Gemini 3.8 Flash Content Intelligence.
+    """Analyze raw content through Gemini 2.5 Flash Content Intelligence.
 
     Deconstructs submitted message into atomic claims, entities, URLs, language,
     and suspicious behavioral signals using structured Pydantic output.

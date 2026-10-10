@@ -28,9 +28,9 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///:memory:")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Gemini Configuration (explicitly required; no implicit model fallback)
+    # Gemini Configuration (default gemini-2.5-flash for dev/testing; explicitly required in production)
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     # Tavily Search API — Phase 5A primary evidence provider (optional; falls back to Google grounding)
     TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")

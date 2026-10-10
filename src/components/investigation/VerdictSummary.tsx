@@ -236,7 +236,7 @@ export function VerdictSummary({ result }: VerdictSummaryProps) {
             <div className="flex items-center justify-between p-2.5 rounded bg-[#080B14] border border-[rgba(255,255,255,0.05)]">
               <span className="text-[var(--muted-foreground)]">Extraction Mode:</span>
               <span className={`font-semibold ${result.contentExtractionMode === "DETERMINISTIC_FALLBACK" ? "text-amber-400" : "text-[var(--foreground)]"}`}>
-                {result.contentExtractionMode === "DETERMINISTIC_FALLBACK" ? "Heuristic Fallback" : "Gemini 3.8 Flash"}
+                {result.contentExtractionMode === "DETERMINISTIC_FALLBACK" ? "Heuristic Fallback" : "Gemini 2.5 Flash"}
               </span>
             </div>
 

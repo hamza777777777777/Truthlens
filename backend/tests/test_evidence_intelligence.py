@@ -240,7 +240,7 @@ def test_ground_claims_success():
     )
     mock_client.models.generate_content.return_value = grounding_resp
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims(SAMPLE_CLAIMS, ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.SUCCESS
@@ -257,7 +257,7 @@ def test_ground_claims_empty_chunks():
     grounding_resp = _make_grounding_response(chunks=[], text="Some text but no chunks.")
     mock_client.models.generate_content.return_value = grounding_resp
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims(SAMPLE_CLAIMS, ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.NO_EVIDENCE
@@ -277,7 +277,7 @@ def test_ground_claims_no_grounding_metadata():
     mock_resp = types.GenerateContentResponse(candidates=[candidate])
     mock_client.models.generate_content.return_value = mock_resp
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims(SAMPLE_CLAIMS, ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.NO_EVIDENCE
@@ -295,7 +295,7 @@ def test_ground_claims_safety_block():
     mock_resp = types.GenerateContentResponse(candidates=[candidate])
     mock_client.models.generate_content.return_value = mock_resp
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims(SAMPLE_CLAIMS, ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.FAILED
@@ -309,7 +309,7 @@ def test_ground_claims_no_candidates():
     mock_resp = types.GenerateContentResponse(candidates=[])
     mock_client.models.generate_content.return_value = mock_resp
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims(SAMPLE_CLAIMS, ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.FAILED
@@ -323,7 +323,7 @@ def test_ground_claims_api_exception():
     mock_client = MagicMock()
     mock_client.models.generate_content.side_effect = errors.ServerError(503, "Service unavailable", None)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims(SAMPLE_CLAIMS, ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.FAILED
@@ -337,7 +337,7 @@ def test_ground_claims_auth_error():
     mock_client = MagicMock()
     mock_client.models.generate_content.side_effect = errors.ClientError(401, "API_KEY_INVALID", None)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims(SAMPLE_CLAIMS, ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.FAILED
@@ -351,7 +351,7 @@ def test_ground_claims_rate_limit_error():
     mock_client = MagicMock()
     mock_client.models.generate_content.side_effect = errors.ClientError(429, "RESOURCE_EXHAUSTED", None)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims(SAMPLE_CLAIMS, ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.FAILED
@@ -364,7 +364,7 @@ def test_ground_claims_network_error():
     mock_client = MagicMock()
     mock_client.models.generate_content.side_effect = ConnectionError("Failed to establish a new connection")
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims(SAMPLE_CLAIMS, ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.FAILED
@@ -390,7 +390,7 @@ def test_ground_claims_unknown_exception():
     mock_client = MagicMock()
     mock_client.models.generate_content.side_effect = RuntimeError("Something completely unexpected happened")
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims(SAMPLE_CLAIMS, ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.FAILED
@@ -402,7 +402,7 @@ def test_ground_claims_empty_claims():
     """Empty claims list returns NO_EVIDENCE, no API call made."""
     mock_client = MagicMock()
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = ground_claims([], ORIGINAL_TEXT, client=mock_client)
 
     assert result.retrieval_status == RetrievalStatus.NO_EVIDENCE
@@ -449,7 +449,7 @@ def test_investigate_with_real_grounding():
     )
     mock_client = _make_two_call_client(MOCK_CONTENT_ANALYSIS_OUTPUT, grounding_resp)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         request = InvestigationRequest(
             input_type="text",
             content=ORIGINAL_TEXT,
@@ -475,7 +475,7 @@ def test_investigate_grounding_unavailable_placeholder():
     failed_grounding = types.GenerateContentResponse(candidates=[])
     mock_client = _make_two_call_client(MOCK_CONTENT_ANALYSIS_OUTPUT, failed_grounding)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
         result = investigate(request, gemini_client=mock_client)
 
@@ -493,7 +493,7 @@ def test_investigate_no_evidence_state():
     empty_grounding = _make_grounding_response(chunks=[], text="No evidence found for these claims.")
     mock_client = _make_two_call_client(MOCK_CONTENT_ANALYSIS_OUTPUT, empty_grounding)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
         result = investigate(request, gemini_client=mock_client)
 
@@ -531,7 +531,7 @@ def test_failed_retrieval_is_not_truth_verdict():
         errors.ClientError(429, "RESOURCE_EXHAUSTED", None),
     ]
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
         result = investigate(request, gemini_client=mock)
 
@@ -560,7 +560,7 @@ def test_investigate_evidence_claim_mapping():
     )
     mock_client = _make_two_call_client(MOCK_CONTENT_ANALYSIS_OUTPUT, grounding_resp)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         request = InvestigationRequest(
             input_type="text",
             content=ORIGINAL_TEXT,
@@ -582,7 +582,7 @@ def test_no_fabricated_evidence():
     )
     mock_client = _make_two_call_client(MOCK_CONTENT_ANALYSIS_OUTPUT, grounding_resp)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         request = InvestigationRequest(
             input_type="text",
             content=ORIGINAL_TEXT,
@@ -612,7 +612,7 @@ def test_truth_assessment_not_yet_performed():
     )
     mock_client = _make_two_call_client(MOCK_CONTENT_ANALYSIS_OUTPUT, grounding_resp)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         request = InvestigationRequest(
             input_type="text",
             content=ORIGINAL_TEXT,
@@ -651,7 +651,7 @@ def test_evidence_retrieval_failed_before_assessment():
         errors.ClientError(401, "API_KEY_INVALID", None),
     ]
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
         result = investigate(request, gemini_client=mock)
 
@@ -743,7 +743,7 @@ def test_stage_attribution_content_failure_deterministic_fallback():
     2. content_analysis_failure_category is RATE_LIMIT
     3. evidence_retrieval_status is SKIPPED (NOT FAILED)
     4. evidence_failure_category is None (retrieval was not attempted)
-    5. No claims state Gemini 3.8 Flash performed extraction
+    5. No claims state Gemini 2.5 Flash performed extraction
     6. Truth status is NOT_ASSESSED
     7. Heuristic scam risk assessment is preserved and succeeds.
     """
@@ -752,7 +752,7 @@ def test_stage_attribution_content_failure_deterministic_fallback():
 
     mock_client = MagicMock()
     with patch("app.services.investigation_service.analyze_content", side_effect=GeminiRateLimitError("Rate limit")):
-        with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+        with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
             request = InvestigationRequest(
                 input_type="text",
                 content="Congratulations! You won ₹50,000. Pay ₹499 fee within 2 hours.",
@@ -770,11 +770,11 @@ def test_stage_attribution_content_failure_deterministic_fallback():
     assert result.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
     assert result.truth_status is None
 
-    # Verify no claims claim Gemini 3.8 Flash extracted it
-    assert "Gemini 3.8 Flash decomposed" not in result.summary_explanation
+    # Verify no claims claim Gemini 2.5 Flash extracted it
+    assert "Gemini 2.5 Flash decomposed" not in result.summary_explanation
     assert "Deterministic heuristic parser extracted" in result.summary_explanation
     for claim in result.claims:
-        assert "Extracted by Gemini 3.8 Flash" not in claim.explanation
+        assert "Extracted by Gemini 2.5 Flash" not in claim.explanation
         assert "Extracted via deterministic heuristic extraction" in claim.explanation
         assert claim.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
         assert claim.truth_status is None
@@ -810,7 +810,7 @@ def test_stage_attribution_evidence_retrieval_failure_distinguished():
         errors.ClientError(429, "RESOURCE_EXHAUSTED", None),
     ]
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
         result = investigate(request, gemini_client=mock)
 
@@ -822,5 +822,5 @@ def test_stage_attribution_evidence_retrieval_failure_distinguished():
     assert "EVIDENCE RETRIEVAL FAILED" in result.headline_verdict
     assert result.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
     assert result.truth_status is None
-    assert "Gemini 3.8 Flash decomposed" in result.summary_explanation
+    assert "Gemini 2.5 Flash decomposed" in result.summary_explanation
 

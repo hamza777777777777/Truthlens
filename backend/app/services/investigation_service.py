@@ -325,7 +325,7 @@ def investigate(
         if content_extraction_mode == "DETERMINISTIC_FALLBACK":
             extraction_prefix = f"Extracted via deterministic heuristic extraction ({claim_item.claim_type}): \"{claim_item.statement}\". "
         else:
-            extraction_prefix = f"Extracted by Gemini 3.8 Flash ({claim_item.claim_type}): \"{claim_item.statement}\". "
+            extraction_prefix = f"Extracted by Gemini 2.5 Flash ({claim_item.claim_type}): \"{claim_item.statement}\". "
 
         claims.append(
             Claim(
@@ -692,7 +692,7 @@ def investigate(
         )
     else:
         extraction_intro = (
-            f"Gemini 3.8 Flash decomposed this content into {len(claims)} atomic claim(s), "
+            f"Gemini 2.5 Flash decomposed this content into {len(claims)} atomic claim(s), "
             f"{len(content_analysis.entities)} entity/entities, and {signals_count} deception signal(s). "
             f"Detected language: {content_analysis.language.name}. "
         )

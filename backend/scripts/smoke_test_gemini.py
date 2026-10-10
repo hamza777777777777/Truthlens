@@ -19,7 +19,7 @@ class SmokeTestSchema(BaseModel):
 
 def run_smoke_test():
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
     sdk_version = getattr(genai, "__version__", "unknown")
 
     print(f"SDK Version: {sdk_version}")

@@ -145,7 +145,7 @@ def test_1_directly_supported_claim():
     )
     client = _make_mock_gemini_client(batch)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=client)
 
     assert result.truth_assessment_status == TruthAssessmentStatus.ASSESSED
@@ -189,7 +189,7 @@ def test_2_directly_contradicted_claim():
     )
     client = _make_mock_gemini_client(batch)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=client)
 
     assert result.overall_truth_status == TruthStatus.FALSE
@@ -239,7 +239,7 @@ def test_3_partially_supported_claim():
     )
     client = _make_mock_gemini_client(batch)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=client)
 
     assert result.overall_truth_status == TruthStatus.PARTIALLY_SUPPORTED
@@ -280,7 +280,7 @@ def test_4_outdated_claim_temporal_evidence():
     )
     client = _make_mock_gemini_client(batch)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=client)
 
     assert result.overall_truth_status == TruthStatus.OUTDATED
@@ -319,7 +319,7 @@ def test_5_inconclusive_insufficient_evidence():
     )
     client = _make_mock_gemini_client(batch)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=client)
 
     assert result.overall_truth_status == TruthStatus.CANNOT_CONFIRM
@@ -366,7 +366,7 @@ def test_6_conflicting_credible_sources():
     )
     client = _make_mock_gemini_client(batch)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=client)
 
     # Deterministic safeguard must downgrade VERIFIED with conflicting credible sources to CANNOT CONFIRM
@@ -405,7 +405,7 @@ def test_7_low_tier_evidence_cannot_verify():
     )
     client = _make_mock_gemini_client(batch)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=client)
 
     # Low-tier evidence alone cannot verify -> downgraded to CANNOT_CONFIRM
@@ -450,7 +450,7 @@ def test_8_duplicate_non_independent_sources():
     )
     client = _make_mock_gemini_client(batch)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=client)
 
     assert result.overall_truth_status == TruthStatus.CANNOT_CONFIRM
@@ -489,7 +489,7 @@ def test_9_unknown_claim_ids_and_evidence_ids():
     )
     client = _make_mock_gemini_client(batch)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=client)
 
     # cl-real was assessed, cl-hallucinated was discarded
@@ -518,7 +518,7 @@ def test_10_malformed_invalid_structured_output():
     mock_resp.prompt_feedback = None
     mock.models.generate_content.return_value = mock_resp
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=mock)
 
     assert result.truth_assessment_status == TruthAssessmentStatus.FAILED
@@ -544,7 +544,7 @@ def test_11_gemini_safety_blocked_response():
     mock_resp.prompt_feedback = None
     mock.models.generate_content.return_value = mock_resp
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=mock)
 
     assert result.truth_assessment_status == TruthAssessmentStatus.FAILED
@@ -611,7 +611,7 @@ def test_14_truth_engine_provider_failure():
     mock = MagicMock()
     mock.models.generate_content.side_effect = errors.ClientError(429, "RESOURCE_EXHAUSTED", None)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=mock)
 
     assert result.truth_assessment_status == TruthAssessmentStatus.FAILED
@@ -652,7 +652,7 @@ def test_15_demo_simulated_evidence_cannot_verify_live():
     )
     client = _make_mock_gemini_client(batch)
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = evaluate_truth([claim], evidence, RetrievalStatus.SUCCESS, client=client)
 
     assessed = result.claims[0]
@@ -761,7 +761,7 @@ def test_17_full_pipeline_claim_to_assessment_integration():
     mock_client = MagicMock()
     mock_client.models.generate_content.side_effect = [call1_resp, call2_resp, call3_resp]
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         req = InvestigationRequest(input_type="text", content="RBI is India's central bank.")
         result = investigate(req, gemini_client=mock_client)
 

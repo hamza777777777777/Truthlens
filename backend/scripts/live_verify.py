@@ -14,7 +14,7 @@ class Ping(BaseModel):
 
 
 api_key = os.getenv("GEMINI_API_KEY", "").strip()
-model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 
 if not api_key:
     print("[ERROR] No API key found in backend/.env")

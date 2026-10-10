@@ -123,7 +123,7 @@ def _create_mock_client(response_text: str):
 # 1. Valid structured Gemini response
 def test_valid_structured_gemini_response():
     mock_client = _create_mock_client(json.dumps(MOCK_VALID_GEMINI_OUTPUT))
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         analysis = analyze_content("Sample message", client=mock_client)
         assert isinstance(analysis, ContentAnalysis)
         assert analysis.normalized_text.startswith("Congratulations!")
@@ -137,7 +137,7 @@ def test_valid_structured_gemini_response():
 # 2. Multiple claim extraction
 def test_multiple_claim_extraction():
     mock_client = _create_mock_client(json.dumps(MOCK_VALID_GEMINI_OUTPUT))
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         analysis = analyze_content("Sample message", client=mock_client)
         statements = [c.statement for c in analysis.claims]
         assert "The recipient has won ₹50,000." in statements
@@ -149,7 +149,7 @@ def test_multiple_claim_extraction():
 # 3. Entity extraction
 def test_entity_extraction():
     mock_client = _create_mock_client(json.dumps(MOCK_VALID_GEMINI_OUTPUT))
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         analysis = analyze_content("Sample message", client=mock_client)
         assert len(analysis.entities) == 1
         assert analysis.entities[0].name == "SBI"
@@ -160,7 +160,7 @@ def test_entity_extraction():
 # 4. URL extraction
 def test_url_extraction():
     mock_client = _create_mock_client(json.dumps(MOCK_VALID_GEMINI_OUTPUT))
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         analysis = analyze_content("Sample message", client=mock_client)
         assert len(analysis.urls) == 1
         assert analysis.urls[0].url == "https://sbi-reward-claim.example"
@@ -170,7 +170,7 @@ def test_url_extraction():
 # 5. Suspicious signal extraction
 def test_suspicious_signal_extraction():
     mock_client = _create_mock_client(json.dumps(MOCK_VALID_GEMINI_OUTPUT))
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         analysis = analyze_content("Sample message", client=mock_client)
         types_found = [s.type for s in analysis.suspicious_signals]
         assert "advance_payment_request" in types_found
@@ -184,7 +184,7 @@ def test_language_detection():
     hindi_output = dict(MOCK_VALID_GEMINI_OUTPUT)
     hindi_output["language"] = {"code": "hi", "name": "Hindi", "confidence": 0.97}
     mock_client = _create_mock_client(json.dumps(hindi_output))
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         analysis = analyze_content("बधाई हो!", client=mock_client)
         assert analysis.language.code == "hi"
         assert analysis.language.name == "Hindi"
@@ -194,7 +194,7 @@ def test_language_detection():
 # 7. Invalid structured response
 def test_invalid_structured_response():
     mock_client = _create_mock_client("invalid non-json text response")
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         with pytest.raises(GeminiSchemaError):
             analyze_content("Sample message", client=mock_client)
 
@@ -203,14 +203,14 @@ def test_invalid_structured_response():
 def test_gemini_provider_error():
     mock_client = MagicMock()
     mock_client.models.generate_content.side_effect = errors.ServerError(503, "Service unavailable", None)
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         with pytest.raises(GeminiProviderError):
             analyze_content("Sample message", client=mock_client)
 
 
 # 9. Missing API key
 def test_missing_api_key():
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": ""}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": ""}):
         with pytest.raises(GeminiConfigError) as exc_info:
             analyze_content("Sample message", client=None)
         assert "GEMINI_API_KEY" in str(exc_info.value)
@@ -228,7 +228,7 @@ def test_missing_model_configuration():
 # 11. Investigation pipeline integration with mock Gemini
 def test_investigate_pipeline_integration():
     mock_client = _create_mock_client(json.dumps(MOCK_VALID_GEMINI_OUTPUT))
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         request = InvestigationRequest(
             input_type="text",
             content="Congratulations! You've won ₹50,000. Pay ₹499.",
@@ -252,7 +252,7 @@ def test_response_candidates_none():
     mock_response = types.GenerateContentResponse(candidates=None)
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         with pytest.raises(GeminiSchemaError) as exc_info:
             analyze_content("Some prompt", client=mock_client)
         assert "no output candidates" in str(exc_info.value)
@@ -264,7 +264,7 @@ def test_response_candidates_empty_list():
     mock_response = types.GenerateContentResponse(candidates=[])
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         with pytest.raises(GeminiSchemaError) as exc_info:
             analyze_content("Some prompt", client=mock_client)
         assert "no output candidates" in str(exc_info.value)
@@ -283,7 +283,7 @@ def test_response_finish_reason_safety():
     )
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         with pytest.raises(GeminiSchemaError) as exc_info:
             analyze_content("Harmful content", client=mock_client)
         assert "safety filters" in str(exc_info.value)
@@ -312,7 +312,7 @@ def test_response_non_stop_finish_reasons(finish_reason, expected_snippet):
     )
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         with pytest.raises(GeminiSchemaError) as exc_info:
             analyze_content("Some content", client=mock_client)
         assert expected_snippet in str(exc_info.value)
@@ -329,7 +329,7 @@ def test_response_prompt_feedback_block_reason():
     )
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         with pytest.raises(GeminiSchemaError) as exc_info:
             analyze_content("Blocked prompt", client=mock_client)
         assert "blocked prompt processing" in str(exc_info.value)
@@ -348,7 +348,7 @@ def test_response_candidate_no_content():
     )
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         with pytest.raises(GeminiSchemaError) as exc_info:
             analyze_content("Some prompt", client=mock_client)
         assert "no content parts" in str(exc_info.value)
@@ -366,7 +366,7 @@ def test_response_candidate_empty_parts():
     )
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         with pytest.raises(GeminiSchemaError) as exc_info:
             analyze_content("Some prompt", client=mock_client)
         assert "no content parts" in str(exc_info.value)
@@ -384,7 +384,7 @@ def test_response_candidate_blank_text_parts():
     )
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         with pytest.raises(GeminiSchemaError) as exc_info:
             analyze_content("Some prompt", client=mock_client)
         assert "no usable text parts" in str(exc_info.value)
@@ -405,7 +405,7 @@ def test_response_normal_stop_finish_reason():
     )
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         result = analyze_content("Some prompt", client=mock_client)
         assert isinstance(result, ContentAnalysis)
         assert len(result.claims) == 4
@@ -429,7 +429,7 @@ def test_response_text_never_accessed_when_candidate_invalid():
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-3.8-flash", "GEMINI_API_KEY": "mock-key"}):
+    with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash", "GEMINI_API_KEY": "mock-key"}):
         # Must raise GeminiSchemaError, NOT AssertionError
         with pytest.raises(GeminiSchemaError):
             analyze_content("Prompt", client=mock_client)

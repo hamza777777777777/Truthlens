@@ -259,7 +259,7 @@ def test_404_not_found(client):
 def test_production_config_missing_secret_key_fails_safely():
     """In production, missing SECRET_KEY raises a clear configuration error."""
     import os
-    with patch.dict(os.environ, {"SECRET_KEY": "", "GEMINI_MODEL": "gemini-3.8-flash"}, clear=False):
+    with patch.dict(os.environ, {"SECRET_KEY": "", "GEMINI_MODEL": "gemini-2.5-flash"}, clear=False):
         with pytest.raises(ValueError) as exc_info:
             create_app("production")
         assert "SECRET_KEY must be explicitly configured" in str(exc_info.value)
@@ -270,7 +270,7 @@ def test_production_config_dev_secret_key_fails_safely():
     import os
     with patch.dict(os.environ, {
         "SECRET_KEY": "dev-secret-key-truthlens-do-not-use-in-production",
-        "GEMINI_MODEL": "gemini-3.8-flash"
+        "GEMINI_MODEL": "gemini-2.5-flash"
     }, clear=False):
         with pytest.raises(ValueError) as exc_info:
             create_app("production")
@@ -294,7 +294,7 @@ def test_production_config_wildcard_cors_forbidden():
     import os
     with patch.dict(os.environ, {
         "SECRET_KEY": "production-secure-key-12345",
-        "GEMINI_MODEL": "gemini-3.8-flash",
+        "GEMINI_MODEL": "gemini-2.5-flash",
         "CORS_ORIGINS": "*"
     }, clear=False):
         with pytest.raises(ValueError) as exc_info:
@@ -307,12 +307,30 @@ def test_production_config_valid_environment_succeeds():
     import os
     with patch.dict(os.environ, {
         "SECRET_KEY": "production-secure-key-12345",
-        "GEMINI_MODEL": "gemini-3.8-flash",
+        "GEMINI_MODEL": "gemini-2.5-flash",
         "CORS_ORIGINS": "https://truthlens.vercel.app,http://localhost:3000"
     }, clear=False):
         prod_app = create_app("production")
         assert prod_app is not None
         assert prod_app.config["SECRET_KEY"] == "production-secure-key-12345"
-        assert prod_app.config["GEMINI_MODEL"] == "gemini-3.8-flash"
+        assert prod_app.config["GEMINI_MODEL"] == "gemini-2.5-flash"
         assert prod_app.config["CORS_ORIGINS"] == ["https://truthlens.vercel.app", "http://localhost:3000"]
+
+
+def test_development_config_default_model_is_gemini_2_5_flash():
+    """In development, default GEMINI_MODEL is gemini-2.5-flash when unset."""
+    import os
+    with patch.dict(os.environ, {}, clear=False):
+        env_copy = {k: v for k, v in os.environ.items() if k != "GEMINI_MODEL"}
+        with patch.dict(os.environ, env_copy, clear=True):
+            dev_app = create_app("development")
+            assert dev_app.config["GEMINI_MODEL"] == "gemini-2.5-flash"
+
+
+def test_development_config_model_override():
+    """In development, GEMINI_MODEL environment variable overrides the default."""
+    import os
+    with patch.dict(os.environ, {"GEMINI_MODEL": "custom-gemini-model"}, clear=False):
+        dev_app = create_app("development")
+        assert dev_app.config["GEMINI_MODEL"] == "custom-gemini-model"
 

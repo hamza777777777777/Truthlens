@@ -18,7 +18,7 @@ from app.services.gemini_service import CONTENT_ANALYSIS_SYSTEM_INSTRUCTION
 
 def run_verification():
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
     sdk_version = getattr(genai, "__version__", "unknown")
 
     print(f"SDK Version: {sdk_version}")
