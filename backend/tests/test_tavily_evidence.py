@@ -53,6 +53,7 @@ from app.services.evidence_service import (
     _normalize_tavily_results,
     _retrieve_via_tavily,
     ground_claims,
+    UsageLimitExceededError,
 )
 from app.services.investigation_service import investigate
 
@@ -581,21 +582,30 @@ class TestGeminiQuotaFailures:
         """When Gemini is rate-limited, content_extraction_mode is DETERMINISTIC_FALLBACK."""
         from app.services.gemini_service import GeminiRateLimitError
 
+        mock_client = MagicMock()
+        mock_client.search.return_value = MOCK_TAVILY_SUCCESS_RESPONSE
+
         request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
-        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}, clear=False):
-            with patch("app.services.investigation_service.analyze_content",
-                       side_effect=GeminiRateLimitError("Rate limit exceeded")):
-                result = investigate(request)
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}, clear=False), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
+                   side_effect=GeminiRateLimitError("Rate limit exceeded")):
+            result = investigate(request)
 
         assert result.content_extraction_mode == "DETERMINISTIC_FALLBACK"
         assert result.content_analysis_failure_category == FailureCategory.RATE_LIMIT
 
     def test_gemini_rate_limit_does_not_fabricate_truth_verdict(self):
-        """Gemini rate limit → fallback extraction → evidence retrieval SKIPPED → NOT_ASSESSED."""
+        """Gemini rate limit → fallback extraction → truth assessment stays NOT_ASSESSED."""
         from app.services.gemini_service import GeminiRateLimitError
 
+        mock_client = MagicMock()
+        mock_client.search.return_value = MOCK_TAVILY_SUCCESS_RESPONSE
+
         request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
-        with patch("app.services.investigation_service.analyze_content",
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
                    side_effect=GeminiRateLimitError("Rate limit exceeded")):
             result = investigate(request)
 
@@ -604,11 +614,12 @@ class TestGeminiQuotaFailures:
         assert result.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
 
     def test_gemini_rate_limit_evidence_skipped_not_reported_as_retrieval_failure(self):
-        """When extraction falls back, evidence_retrieval_status is SKIPPED, not FAILED."""
+        """When extraction falls back and no Tavily key is configured, evidence_retrieval_status is SKIPPED."""
         from app.services.gemini_service import GeminiRateLimitError
 
         request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
-        with patch("app.services.investigation_service.analyze_content",
+        with patch("app.services.investigation_service._get_tavily_api_key", return_value=None), \
+             patch("app.services.investigation_service.analyze_content",
                    side_effect=GeminiRateLimitError("Rate limit exceeded")):
             result = investigate(request)
 
@@ -618,8 +629,13 @@ class TestGeminiQuotaFailures:
         """When fallback is used, extraction prefix says 'deterministic', not 'Gemini'."""
         from app.services.gemini_service import GeminiRateLimitError
 
+        mock_client = MagicMock()
+        mock_client.search.return_value = MOCK_TAVILY_SUCCESS_RESPONSE
+
         request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
-        with patch("app.services.investigation_service.analyze_content",
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
                    side_effect=GeminiRateLimitError("Rate limit exceeded")):
             result = investigate(request)
 
@@ -632,13 +648,168 @@ class TestGeminiQuotaFailures:
         """Scam signals and risk fusion still execute when deterministic extraction is used."""
         from app.services.gemini_service import GeminiRateLimitError
 
+        mock_client = MagicMock()
+        mock_client.search.return_value = MOCK_TAVILY_SUCCESS_RESPONSE
+
         request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
-        with patch("app.services.investigation_service.analyze_content",
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
                    side_effect=GeminiRateLimitError("Rate limit exceeded")):
             result = investigate(request)
 
         # Risk fusion should still run (inputs: heuristic signals from fallback analysis)
         assert result.scam_risk_score is not None or result.scam_assessment_status.value in ("ASSESSED", "NOT_ASSESSED")
+
+
+# ---------------------------------------------------------------------------
+# 9B. FALLBACK EXTRACTION + TAVILY INTEGRATION REGRESSION TESTS (A - F)
+# ---------------------------------------------------------------------------
+
+class TestFallbackExtractionTavilyIntegration:
+    """
+    Regression suite for Phase 5A:
+    Ensures Tavily evidence retrieval executes when Gemini content analysis
+    hits RATE_LIMIT and deterministic fallback successfully extracts claims.
+    """
+
+    def test_a_gemini_rate_limit_with_fallback_extraction_calls_tavily(self):
+        """A. Gemini RATE_LIMIT + successful fallback extraction → Tavily is called."""
+        from app.services.gemini_service import GeminiRateLimitError
+
+        mock_client = MagicMock()
+        mock_client.search.return_value = MOCK_TAVILY_SUCCESS_RESPONSE
+
+        request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
+                   side_effect=GeminiRateLimitError("Rate limit exceeded")):
+            result = investigate(request)
+
+        assert mock_client.search.called is True
+        assert result.content_extraction_mode == "DETERMINISTIC_FALLBACK"
+        assert result.content_analysis_failure_category == FailureCategory.RATE_LIMIT
+
+    def test_b_gemini_rate_limit_tavily_returns_real_results(self):
+        """B. Gemini RATE_LIMIT + Tavily returns real results → real evidence appears with is_simulated_demo=false."""
+        from app.services.gemini_service import GeminiRateLimitError
+
+        mock_client = MagicMock()
+        mock_client.search.return_value = MOCK_TAVILY_SUCCESS_RESPONSE
+
+        request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
+                   side_effect=GeminiRateLimitError("Rate limit exceeded")):
+            result = investigate(request)
+
+        assert result.evidence_retrieval_status == RetrievalStatus.SUCCESS
+        assert len(result.evidence) >= 2
+        for ev in result.evidence:
+            assert ev.is_simulated_demo is False
+            assert ev.url is not None
+            assert ev.title is not None
+        assert result.metrics.sources_corroborated == len(result.evidence)
+        # Verify claims have references mapped
+        assert any(len(c.evidence_ref_ids) > 0 for c in result.claims)
+
+    def test_c_gemini_rate_limit_tavily_failure_preserves_error(self):
+        """C. Gemini RATE_LIMIT + Tavily failure → evidence failure is shown, no fabricated evidence."""
+        from app.services.gemini_service import GeminiRateLimitError
+
+        mock_client = MagicMock()
+        mock_client.search.side_effect = UsageLimitExceededError("Tavily usage limit exceeded")
+
+        request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
+                   side_effect=GeminiRateLimitError("Rate limit exceeded")):
+            result = investigate(request)
+
+        assert result.evidence_retrieval_status == RetrievalStatus.FAILED
+        assert result.evidence_failure_category == FailureCategory.RATE_LIMIT
+        assert len(result.evidence) == 1
+        assert result.evidence[0].id == "ev-retrieval-failed"
+        assert result.evidence[0].is_simulated_demo is True
+        assert result.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
+        assert result.truth_status is None
+
+    def test_d_gemini_rate_limit_no_usable_fallback_claims_skips_retrieval(self):
+        """D. Gemini RATE_LIMIT + no usable fallback claims → evidence retrieval legitimately skipped."""
+        from app.services.gemini_service import GeminiRateLimitError
+        from app.schemas.content_analysis import ContentAnalysis, LanguageInfo
+
+        mock_client = MagicMock()
+
+        # Fallback returns 0 claims
+        empty_claims_analysis = ContentAnalysis(
+            normalized_text="short",
+            language=LanguageInfo(code="en", name="English", confidence=0.9),
+            claims=[],
+            entities=[],
+            urls=[],
+            suspicious_signals=[],
+        )
+
+        request = InvestigationRequest(input_type="text", content="short")
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
+                   side_effect=GeminiRateLimitError("Rate limit exceeded")), \
+             patch("app.services.investigation_service._fallback_content_analysis",
+                   return_value=empty_claims_analysis):
+            result = investigate(request)
+
+        assert result.evidence_retrieval_status == RetrievalStatus.SKIPPED
+        assert mock_client.search.called is False
+        assert result.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
+        assert result.truth_status is None
+
+    def test_e_no_tavily_key_existing_fallback_behavior_remains_correct(self):
+        """E. No Tavily key → existing fallback behavior remains correct (Google grounding skipped)."""
+        from app.services.gemini_service import GeminiRateLimitError
+
+        request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
+        with patch("app.services.investigation_service._get_tavily_api_key", return_value=None), \
+             patch("app.services.investigation_service.analyze_content",
+                   side_effect=GeminiRateLimitError("Rate limit exceeded")):
+            result = investigate(request)
+
+        assert result.evidence_retrieval_status == RetrievalStatus.SKIPPED
+        assert result.content_extraction_mode == "DETERMINISTIC_FALLBACK"
+        assert result.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
+        assert result.truth_status is None
+
+    def test_f_truth_verdict_never_fabricated_on_fallback_path(self):
+        """F. Truth verdict is never fabricated because of the fallback path."""
+        from app.services.gemini_service import GeminiRateLimitError
+
+        mock_client = MagicMock()
+        mock_client.search.return_value = MOCK_TAVILY_SUCCESS_RESPONSE
+
+        request = InvestigationRequest(input_type="text", content=ORIGINAL_TEXT)
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test-key"}), \
+             patch(_TAVILY_PATCH, return_value=mock_client), \
+             patch("app.services.investigation_service.analyze_content",
+                   side_effect=GeminiRateLimitError("Rate limit exceeded")):
+            result = investigate(request)
+
+        # Epistemic truth assessment must stay NOT_ASSESSED (pending)
+        assert result.truth_status is None
+        assert result.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
+        assert result.truth_assessment_failure_category is None
+
+        # Each claim must also be NOT_ASSESSED with None truth_status
+        for claim in result.claims:
+            assert claim.truth_status is None
+            assert claim.truth_assessment_status == TruthAssessmentStatus.NOT_ASSESSED
+
+        # Headline and synthesis must not claim a fabricated verdict
+        assert "FALSE" not in result.headline_verdict
+        assert "VERIFIED" not in result.headline_verdict
 
 
 # ---------------------------------------------------------------------------

@@ -143,7 +143,7 @@ from app.schemas.investigation import (
     UrlInvestigationData,
 )
 from app.services.gemini_service import analyze_content
-from app.services.evidence_service import ground_claims
+from app.services.evidence_service import _get_tavily_api_key, ground_claims
 from app.services.truth_engine import evaluate_truth
 from app.services.scam_investigator import ScamInvestigator
 from app.services.risk_fusion import DeterministicRiskFusion
@@ -246,19 +246,48 @@ def investigate(
         content_analysis_failure = FailureCategory.PROVIDER_ERROR
         content_analysis = _fallback_content_analysis(normalized_input)
 
-    # [Call 2] Evidence Intelligence — Google Search grounding (separate call)
-    # NOTE: grounding + response_schema cannot be combined in Gemini API.
-    # If upstream content analysis failed, do NOT attempt grounding or report it as retrieval failure.
+    # [Call 2] Evidence Intelligence — Tavily Search API or Google Grounding
+    # In Phase 5A, Tavily Search API is an independent provider that does not rely on Gemini.
+    # Therefore, an upstream Gemini content analysis failure (e.g. RATE_LIMIT) does NOT prevent
+    # Tavily evidence retrieval, provided usable claims were extracted by deterministic fallback.
+    # Safe routing safeguards:
+    # 1. If no usable claims exist, retrieval is legitimately SKIPPED.
+    # 2. If Gemini failed upstream and Tavily is NOT configured, Google grounding is SKIPPED
+    #    to prevent cascading Gemini quota/auth errors.
+    # 3. If Tavily is configured, Tavily searches for the extracted claims regardless of upstream mode.
     content_extraction_mode = "GEMINI_LLM"
     if content_analysis_failure is not None:
         content_extraction_mode = "DETERMINISTIC_FALLBACK"
+
+    tavily_configured = bool(_get_tavily_api_key())
+    has_usable_claims = bool(
+        content_analysis.claims
+        and any(c.statement and c.statement.strip() for c in content_analysis.claims)
+    )
+
+    if not has_usable_claims:
+        logger.info("[INVESTIGATION] No usable claims extracted; skipping evidence retrieval.")
+        grounding = GroundingAnalysis(
+            retrieval_status=RetrievalStatus.SKIPPED,
+            failure_category=None,
+            is_grounded=False,
+        )
+    elif content_analysis_failure is not None and not tavily_configured:
+        logger.info(
+            f"[INVESTIGATION] Upstream content analysis failed ({content_analysis_failure.value}) and Tavily is not configured; "
+            "skipping Gemini Google grounding."
+        )
         grounding = GroundingAnalysis(
             retrieval_status=RetrievalStatus.SKIPPED,
             failure_category=None,
             is_grounded=False,
         )
     else:
-        grounding: GroundingAnalysis = ground_claims(
+        logger.info(
+            f"[INVESTIGATION] Initiating evidence retrieval for {len(content_analysis.claims)} claim(s) "
+            f"(extraction_mode={content_extraction_mode}, tavily_configured={tavily_configured})."
+        )
+        grounding = ground_claims(
             claims=content_analysis.claims,
             original_text=normalized_input,
             client=gemini_client,
@@ -285,7 +314,7 @@ def investigate(
                 "Grounding completed; no direct sources isolated for this specific claim. "
             )
         elif grounding.retrieval_status == RetrievalStatus.NO_EVIDENCE:
-            evidence_note = "Google Search completed successfully; no external sources were returned for this claim. "
+            evidence_note = "External evidence search completed successfully; no external sources were returned for this claim. "
         elif grounding.retrieval_status == RetrievalStatus.SKIPPED:
             fail_str = content_analysis_failure.value if content_analysis_failure else "LIMIT"
             evidence_note = f"External evidence retrieval was skipped ({fail_str} upstream); evidence assessment is pending. "
@@ -505,7 +534,11 @@ def investigate(
         else True
     )
 
-    if should_run_truth and grounding.retrieval_status not in (RetrievalStatus.FAILED, RetrievalStatus.SKIPPED):
+    if (
+        should_run_truth
+        and content_analysis_failure is None
+        and grounding.retrieval_status not in (RetrievalStatus.FAILED, RetrievalStatus.SKIPPED)
+    ):
         truth_result = evaluate_truth(
             claims=claims,
             evidence=evidence,
@@ -518,12 +551,35 @@ def investigate(
         truth_assessment_status = truth_result.truth_assessment_status
         truth_assessment_failure_cat = truth_result.truth_assessment_failure_category
         truth_synthesis = truth_result.synthesis_explanation
+    elif content_analysis_failure is not None:
+        logger.info("[INVESTIGATION] Content analysis used fallback; keeping truth assessment NOT_ASSESSED.")
+        truth_status = None
+        truth_assessment_status = TruthAssessmentStatus.NOT_ASSESSED
+        truth_assessment_failure_cat = None
+        fail_lbl = content_analysis_failure.value if content_analysis_failure else "UPSTREAM_LIMIT"
+        if grounding.retrieval_status == RetrievalStatus.SUCCESS and evidence:
+            truth_synthesis = (
+                f"External evidence was retrieved successfully ({len(evidence)} source(s)), but epistemic "
+                f"truth assessment requires Gemini LLM intelligence ({fail_lbl} upstream). "
+                "Truth assessment remains pending; no verdicts fabricated."
+            )
+        elif grounding.retrieval_status == RetrievalStatus.FAILED:
+            fail_cat_str = grounding.failure_category.value if grounding.failure_category else "UNKNOWN"
+            truth_synthesis = (
+                f"External evidence retrieval failed ({fail_cat_str}). "
+                "Truth assessment was not executed; no truth verdicts fabricated."
+            )
+        else:
+            truth_synthesis = (
+                f"Content analysis triggered fallback ({fail_lbl}); "
+                "truth assessment was not executed. No truth verdicts fabricated."
+            )
     elif grounding.retrieval_status == RetrievalStatus.SKIPPED:
         logger.info("[INVESTIGATION] Evidence retrieval skipped; skipping truth assessment.")
         truth_status = None
         truth_assessment_status = TruthAssessmentStatus.NOT_ASSESSED
         truth_assessment_failure_cat = None
-        truth_synthesis = "Evidence retrieval was skipped due to upstream limits; truth assessment was not run."
+        truth_synthesis = "Evidence retrieval was skipped; truth assessment was not run."
     elif grounding.retrieval_status == RetrievalStatus.FAILED:
         logger.info("[INVESTIGATION] Evidence retrieval failed; skipping truth assessment.")
         truth_status = None
@@ -546,17 +602,17 @@ def investigate(
     if grounding.retrieval_status == RetrievalStatus.SUCCESS:
         grounding_headline = f" • {len(evidence)} SOURCE(S) GROUNDED"
         grounding_summary = (
-            f"Google Search grounding retrieved {len(evidence)} external source(s) across "
+            f"External evidence search retrieved {len(evidence)} external source(s) across "
             f"{len(grounding.grounding_search_queries)} search query/queries. "
         )
-        grounding_note = f"Google Search grounding retrieved {len(evidence)} external source(s). "
+        grounding_note = f"External evidence search retrieved {len(evidence)} external source(s). "
     elif grounding.retrieval_status == RetrievalStatus.NO_EVIDENCE:
         grounding_headline = " [NO SOURCES RETRIEVED]"
         grounding_summary = (
-            "Google Search grounding completed successfully, but returned no external sources for these claims. "
+            "External evidence search completed successfully, but returned no external sources for these claims. "
             "No fabricated sources have been inserted. "
         )
-        grounding_note = "Google Search completed with no external sources returned. "
+        grounding_note = "External evidence search completed with no external sources returned. "
     elif grounding.retrieval_status == RetrievalStatus.SKIPPED:
         fail_label = content_analysis_failure.value if content_analysis_failure else "LIMIT"
         grounding_headline = " [EVIDENCE RETRIEVAL SKIPPED]"

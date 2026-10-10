@@ -51,6 +51,18 @@ export function InvestigationHeader({
             <span className="text-[11px] font-semibold text-emerald-300/90 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
               VERIFIED SOURCES &middot; LIVE GROUNDING
             </span>
+          ) : result.evidenceRetrievalStatus === "SKIPPED" ? (
+            <span className="text-[11px] font-semibold text-zinc-300/90 bg-zinc-500/10 border border-zinc-500/30 px-2 py-0.5 rounded">
+              EVIDENCE RETRIEVAL &middot; SKIPPED
+            </span>
+          ) : result.evidenceRetrievalStatus === "FAILED" ? (
+            <span className="text-[11px] font-semibold text-rose-300/90 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded">
+              EVIDENCE RETRIEVAL &middot; UNAVAILABLE
+            </span>
+          ) : result.evidenceRetrievalStatus === "NO_EVIDENCE" ? (
+            <span className="text-[11px] font-semibold text-amber-300/90 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded">
+              EVIDENCE RETRIEVAL &middot; NO SOURCES FOUND
+            </span>
           ) : (
             <span className="text-[11px] font-semibold text-amber-300/90 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded">
               DEMO INVESTIGATION &middot; SIMULATED EVIDENCE
